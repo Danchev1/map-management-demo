@@ -7,6 +7,7 @@ import {LASWorkerLoader} from '@loaders.gl/las';
 const LAZ_SAMPLE = 'http://localhost:9090/download-laz';
 const LAZ_SAMPLE2 = 'https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/point-cloud-laz/indoor.0.1.laz';
 const LAZ_SAMPLE3 = 'https://storage.googleapis.com/xp-lidar-1/20230607_013618_vMS3D_Velodyne_HDL32E.laz';
+const LAZ_SAMPLE4 = 'https://storage.googleapis.com/xp-lidar-1/pointCloudDemoLargo.copc.laz';
 
 const INITIAL_VIEW_STATE = {
     target: [0, 0, 0],
