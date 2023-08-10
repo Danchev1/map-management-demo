@@ -29,7 +29,7 @@ export const App = ({onLoad}: any) => {
     const [blobData, setBlobData] = useState<any>(null);
 
     const getLaz = () => {
-        fetch(LAZ_SAMPLE3).then((response) => response.arrayBuffer()).then((blob) => {
+        fetch(LAZ_SAMPLE4).then((response) => response.arrayBuffer()).then((blob) => {
             console.log(blob);
             let objectURL = URL.createObjectURL(new Blob([blob], {type: 'application/octet-stream'}));
             setBlobData(objectURL);
