@@ -1,109 +1,62 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import DeckGL from '@deck.gl/react/typed';
-import {PointCloudLayer} from '@deck.gl/layers/typed';
-import {COORDINATE_SYSTEM, OrbitView, LinearInterpolator} from '@deck.gl/core/typed';
-import {LASWorkerLoader} from '@loaders.gl/las';
+import {Tile3DLayer} from "@deck.gl/geo-layers/typed";
+import {CesiumIonLoader} from '@loaders.gl/3d-tiles';
+import {OrbitView} from "deck.gl/typed";
 
-const LAZ_SAMPLE = 'http://localhost:9090/download-laz';
-const LAZ_SAMPLE2 = 'https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/point-cloud-laz/indoor.0.1.laz';
-const LAZ_SAMPLE3 = 'https://storage.googleapis.com/xp-lidar-1/20230607_013618_vMS3D_Velodyne_HDL32E.laz';
-const LAZ_SAMPLE4 = 'https://storage.googleapis.com/xp-lidar-1/pointCloudDemoLargo.copc.laz';
+
+const ION_ASSET_ID = 2158311;
+const ION_TOKEN =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiOTA5Mjg5My1jNjljLTQyOWItYWM5Zi00MmQwMTJhZWU2NTYiLCJpZCI6MTYwNTQyLCJpYXQiOjE2OTIwOTU3NDR9.2sPCQMctdB_z2dnckvtN76-gAxdtwKM3iQSxTJXVB0A';
+const TILESET_URL = `https://assets.ion.cesium.com/${ION_ASSET_ID}/tileset.json`;
+const TILESET_URL_Local = `http://localhost:3000/pointCloudDemoLargoLAS/tileset.json`;
 
 const INITIAL_VIEW_STATE = {
-    target: [0, 0, 0],
-    rotationX: 0,
-    rotationOrbit: 0,
-    orbitAxis: 'Y',
-    fov: 50,
-    minZoom: 0,
-    maxZoom: 10,
-    zoom: 1
+    latitude: 40,
+    longitude: -75,
+    pitch: 45,
+    maxPitch: 60,
+    bearing: 0,
+    zoom: 17
 };
 
-const transitionInterpolator = new LinearInterpolator(['rotationOrbit']);
+export const App = ({
+                        mapStyle = 'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json',
+                        updateAttributions
+                    }: any) => {
+    const [initialViewState, setInitialViewState] = useState(INITIAL_VIEW_STATE);
 
-export const App = ({onLoad}: any) => {
-    const [viewState, updateViewState] = useState(INITIAL_VIEW_STATE);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [layers, setLayers] = useState<Array<any>>([]);
-    const [blobData, setBlobData] = useState<any>(null);
 
-    const getLaz = () => {
-        fetch(LAZ_SAMPLE4).then((response) => response.arrayBuffer()).then((blob) => {
-            console.log(blob);
-            let objectURL = URL.createObjectURL(new Blob([blob], {type: 'application/octet-stream'}));
-            setBlobData(objectURL);
-        });
-
-        URL.revokeObjectURL('http://localhost:9090/download-laz');
-    };
-
-    useEffect(() => {
-        if (!isLoaded) {
-            return;
-        }
-        const rotateCamera = () => {
-            updateViewState(v => ({
-                ...v,
-                rotationOrbit: v.rotationOrbit + 120,
-                transitionDuration: 2400,
-                transitionInterpolator,
-                onTransitionEnd: rotateCamera
-            }));
-        };
-        rotateCamera();
-    }, [isLoaded]);
-
-    const onDataLoad = ({header}: any) => {
-        if (header.boundingBox) {
-            const [mins, maxs] = header.boundingBox;
-            // File contains bounding box info
-            updateViewState({
+    const layer = new Tile3DLayer({
+        id: 'tile-3d-layer',
+        // tileset json file url
+        data: TILESET_URL,
+        loader: CesiumIonLoader,
+        // https://cesium.com/docs/rest-api/
+        pointSize: 2,
+        loadOptions: {
+            'cesium-ion': {accessToken: ION_TOKEN}
+        },
+        onTilesetLoad: (tileset: any) => {
+            // Recenter view to cover the new tileset
+            const {cartographicCenter, zoom} = tileset;
+            setInitialViewState({
                 ...INITIAL_VIEW_STATE,
-                target: [(mins[0] + maxs[0]) / 2, (mins[1] + maxs[1]) / 2, (mins[2] + maxs[2]) / 2],
-                /* global window */
-                zoom: Math.log2(window.innerWidth / (maxs[0] - mins[0])) - 1
+                longitude: cartographicCenter[0],
+                latitude: cartographicCenter[1],
+                zoom
             });
-            setIsLoaded(true);
+
+            if (updateAttributions) {
+                updateAttributions(tileset.credits && tileset.credits.attributions);
+            }
         }
+    });
 
-        if (onLoad) {
-            onLoad({count: header.vertexCount, progress: 1});
-        }
-    };
+    console.log(layer);
 
-    useEffect(() => {
-        getLaz();
-    }, [])
-
-    useEffect(() => {
-        blobData && setLayers([
-            new PointCloudLayer({
-                id: 'laz-point-cloud-layer',
-                data: blobData,
-                onDataLoad,
-                coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-                getNormal: [0, 1, 0],
-                getColor: [255, 255, 255],
-                opacity: 0.5,
-                pointSize: 0.5,
-                loaders: [LASWorkerLoader]
-            })])
-    }, [blobData])
-
-    {/*@ts-ignore*/}
-    return (layers.length ?
-            <DeckGL
-                views={new OrbitView({orbitAxis: 'Y', fovy: 50})}
-                viewState={viewState}
-                controller={true}
-                onClick={(e) => console.log(e)}
-                onViewStateChange={(v: any) => updateViewState(v.viewState)}
-                layers={layers}
-                parameters={{
-                    clearColor: [0.93, 0.86, 0.81, 1]
-                }}
-            /> : <></>
-    )
-        ;
+    {/*@ts-ignore*/
+    }
+    return (<DeckGL layers={[layer]} initialViewState={initialViewState} controller={true} onClick={(e) => console.log('deck.gl -', e)}>
+    </DeckGL>);
 }
